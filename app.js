@@ -570,7 +570,7 @@ function fuzzyMatch(guess, target) {
 async function aiJudgeAuctionBatch(prompt, items) {
   if (!items.length) return {};
   try {
-    const { data, error } = await sb.functions.invoke("judge", { body: { mode: "auction_batch", prompt, items } });
+    const { data, error } = await sb.functions.invoke("hyper-worker", { body: { mode: "auction_batch", prompt, items } });
     if (error) throw error;
     return data.results || {};
   } catch (e) {
@@ -581,35 +581,46 @@ async function aiJudgeAuctionBatch(prompt, items) {
 }
 async function aiJudgeR4Question(player, question) {
   try {
-    const { data, error } = await sb.functions.invoke("judge", { body: { mode: "r4_question", player, question } });
+    const { data, error } = await sb.functions.invoke("hyper-worker", { body: { mode: "r4_question", player, question } });
     if (error) throw error;
     return data.answer === "نعم" ? "نعم" : "لا";
   } catch (e) { return "لا"; }
 }
+async function aiJudgeBatch(context, correctAnswer, submissions) {
+  if (!submissions.length) return {};
+  try {
+    const { data, error } = await sb.functions.invoke("hyper-worker", { body: { mode: "judge_batch", context, correctAnswer, submissions } });
+    if (error) throw error;
+    return data.results || {};
+  } catch (e) {
+    const fallback = {};
+    submissions.forEach(s => { fallback[s.id] = fuzzyMatch(s.text, correctAnswer); });
+    return fallback;
+  }
+}
 async function aiRound1Guess(phase, clueValue) {
   try {
-    const { data, error } = await sb.functions.invoke("judge", { body: { mode: "ai_round1_guess", phase, clueValue } });
     if (error) throw error;
     return data.guess || null;
   } catch (e) { return null; }
 }
 async function aiRound2Answer(question) {
   try {
-    const { data, error } = await sb.functions.invoke("judge", { body: { mode: "ai_round2_answer", question } });
+    const { data, error } = await sb.functions.invoke("hyper-worker", { body: { mode: "ai_round2_answer", question } });
     if (error) throw error;
     return data.answer || null;
   } catch (e) { return null; }
 }
 async function aiRound3List(prompt) {
   try {
-    const { data, error } = await sb.functions.invoke("judge", { body: { mode: "ai_round3_list", prompt } });
+    const { data, error } = await sb.functions.invoke("hyper-worker", { body: { mode: "ai_round3_list", prompt } });
     if (error) throw error;
     return data.list || [];
   } catch (e) { return []; }
 }
 async function aiRound4Turn(history) {
   try {
-    const { data, error } = await sb.functions.invoke("judge", { body: { mode: "ai_round4_turn", history } });
+    const { data, error } = await sb.functions.invoke("hyper-worker", { body: { mode: "ai_round4_turn", history } });
     if (error) throw error;
     return data;
   } catch (e) { return { type: "question", value: "هل هو مهاجم؟" }; }
@@ -664,8 +675,17 @@ async function hostResolveRound1(s, ip1, ip2) {
 
   const player = r1.players[r1.idx];
   const points = { position: 5, nationality: 3, club: 2 }[r1.phase];
-  const correct1 = a1 && a1.type === "guess" && fuzzyMatch(a1.value, player.name);
-  const correct2 = a2 && a2.type === "guess" && fuzzyMatch(a2.value, player.name);
+
+  const submissions = [];
+  if (a1 && a1.type === "guess") submissions.push({ id: "p1", text: a1.value });
+  if (a2 && a2.type === "guess") submissions.push({ id: "p2", text: a2.value });
+
+  let correct1 = false, correct2 = false;
+  if (submissions.length) {
+    const results = await aiJudgeBatch("اسم لاعب كرة قدم حقيقي", player.name, submissions);
+    correct1 = !!results["p1"];
+    correct2 = !!results["p2"];
+  }
 
   if (correct1 && !correct2) { s.scoreP1 += points; advanceRound1Player(s); }
   else if (correct2 && !correct1) { s.scoreP2 += points; advanceRound1Player(s); }
@@ -702,8 +722,16 @@ async function hostResolveRound2(s, ip1, ip2) {
   if (!bothActed && !timedOut) return;
 
   const q = r2.questions[r2.idx];
-  const correct1 = a1 && a1.type === "guess" && fuzzyMatch(a1.value, q.a);
-  const correct2 = a2 && a2.type === "guess" && fuzzyMatch(a2.value, q.a);
+  const submissions = [];
+  if (a1 && a1.type === "guess") submissions.push({ id: "p1", text: a1.value });
+  if (a2 && a2.type === "guess") submissions.push({ id: "p2", text: a2.value });
+
+  let correct1 = false, correct2 = false;
+  if (submissions.length) {
+    const results = await aiJudgeBatch("إجابة سؤال ثقافة كروية", q.a, submissions);
+    correct1 = !!results["p1"];
+    correct2 = !!results["p2"];
+  }
 
   if (correct1 && !correct2) s.scoreP1 += 3;
   else if (correct2 && !correct1) s.scoreP2 += 3;
@@ -774,7 +802,8 @@ async function hostResolveRound4(s, ip1, ip2) {
   for (const [k, inp] of [["p1", ip1], ["p2", ip2]]) {
     if (inp.type === "r4_final_guess") {
       const target = k === "p1" ? r4.secretForP1 : r4.secretForP2;
-      if (fuzzyMatch(inp.value, target.name)) {
+      const results = await aiJudgeBatch("اسم لاعب كرة قدم حقيقي", target.name, [{ id: k, text: inp.value }]);
+      if (results[k]) {
         if (k === "p1") s.scoreP1 += 5; else s.scoreP2 += 5;
         return goToNextRound(s);
       }
@@ -895,6 +924,19 @@ function showResult(match) {
   showScreen("screen-result");
 }
 document.getElementById("btn-back-home").addEventListener("click", async () => {
+  const { data: profile } = await sb.from("profiles").select("*").eq("id", me.id).single();
+  if (profile) me = profile;
+  renderHome();
+  showScreen("screen-home");
+});
+
+document.getElementById("btn-exit-match").addEventListener("click", async () => {
+  if (!confirm("متأكد إنك عايز تخرج من المباراة؟ لو خرجت المباراة هتتلغي من غير ما تُحسب.")) return;
+  if (currentMatch && !isAiMatch(currentMatch) && !currentMatch.id.toString().startsWith("local-")) {
+    try { await sb.from("matches").update({ status: "declined" }).eq("id", currentMatch.id); } catch (e) {}
+  }
+  cleanupMatchChannel();
+  currentMatch = null;
   const { data: profile } = await sb.from("profiles").select("*").eq("id", me.id).single();
   if (profile) me = profile;
   renderHome();

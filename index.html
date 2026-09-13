@@ -141,16 +141,19 @@
 
 <section id="screen-game" class="screen">
   <header class="game-topbar">
+    <button id="btn-exit-match" class="icon-btn" title="خروج من المباراة">✕</button>
+    <div class="round-indicator" id="round-indicator">جولة ١</div>
+  </header>
+  <div class="game-topbar" style="margin-top:8px;">
     <div class="score-chip me">
       <span id="game-my-name">أنا</span>
       <span id="game-my-score" class="score-num">0</span>
     </div>
-    <div class="round-indicator" id="round-indicator">جولة ١</div>
     <div class="score-chip opp">
       <span id="game-opp-score" class="score-num">0</span>
       <span id="game-opp-name">الخصم</span>
     </div>
-  </header>
+  </div>
 
   <div class="timer-wrap">
     <div class="timer-bar"><div id="timer-fill" class="timer-fill"></div></div>
@@ -189,4 +192,3 @@
 <script src="app.js" defer></script>
 </body>
 </html>
-
