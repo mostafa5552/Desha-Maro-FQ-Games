@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>DESHA &amp; MARO FQ GAMES</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="toast" class="toast hidden"></div>
+
+<section id="screen-auth" class="screen active">
+  <div class="brand">
+    <div class="brand-mark">FQ</div>
+    <h1>DESHA <span>&amp;</span> MARO<br/>FQ GAMES</h1>
+    <p class="tag">لعبة أسئلة كورة أونلاين — العب مع أصحابك</p>
+  </div>
+
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="login">دخول</button>
+      <button class="auth-tab" data-tab="signup">حساب جديد</button>
+    </div>
+
+    <form id="form-login" class="auth-form active">
+      <label>اسم المستخدم</label>
+      <input type="text" id="login-username" placeholder="مثال: maro_10" required autocomplete="username"/>
+      <label>كلمة السر</label>
+      <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password"/>
+      <button type="submit" class="btn-primary">دخول</button>
+    </form>
+
+    <form id="form-signup" class="auth-form">
+      <label>اسم المستخدم</label>
+      <input type="text" id="signup-username" placeholder="من ٣ لـ ١٥ حرف/رقم" required minlength="3" maxlength="15" pattern="[A-Za-z0-9_]+"/>
+      <label>كلمة السر</label>
+      <input type="password" id="signup-password" placeholder="٦ حروف على الأقل" required minlength="6"/>
+      <button type="submit" class="btn-primary">إنشاء الحساب</button>
+    </form>
+
+    <p id="auth-error" class="error-text hidden"></p>
+  </div>
+</section>
+
+<section id="screen-home" class="screen">
+  <header class="topbar">
+    <div class="user-chip">
+      <div class="avatar" id="home-avatar">?</div>
+      <div>
+        <div class="username" id="home-username">—</div>
+        <div class="sub">لاعب</div>
+      </div>
+    </div>
+    <button id="btn-logout" class="icon-btn" title="خروج">⎋</button>
+  </header>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-value" id="home-wins">0</div>
+      <div class="stat-label">ماتشات كسبتها</div>
+    </div>
+    <div class="stat-card highlight">
+      <div class="stat-value" id="home-points">0</div>
+      <div class="stat-label">النقاط</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="home-record">0-0-0</div>
+      <div class="stat-label">فوز-خسارة-تعادل</div>
+    </div>
+  </div>
+
+  <div id="pending-match-banner" class="banner hidden">
+    <span id="pending-match-text"></span>
+    <div class="banner-actions">
+      <button id="btn-accept-match" class="btn-small btn-primary">قبول</button>
+      <button id="btn-decline-match" class="btn-small btn-ghost">رفض</button>
+    </div>
+  </div>
+
+  <nav class="home-nav">
+    <button class="nav-card" data-goto="screen-friends">
+      <span class="nav-icon">👥</span>
+      <span>الأصدقاء</span>
+    </button>
+    <button class="nav-card nav-card-main" id="btn-start-match">
+      <span class="nav-icon">⚽</span>
+      <span>ابدأ ماتش</span>
+    </button>
+  </nav>
+  <button class="nav-card nav-card-ai" id="btn-play-ai">
+    <span class="nav-icon">🤖</span>
+    <span>العب مع الذكاء الاصطناعي</span>
+  </button>
+  <button class="nav-card nav-card-howto" id="btn-howto" data-goto="screen-howto">
+    <span class="nav-icon">📖</span>
+    <span>كيفية اللعب</span>
+  </button>
+</section>
+
+<section id="screen-howto" class="screen">
+  <header class="subbar">
+    <button class="back-btn" data-goto="screen-home">→</button>
+    <h2>كيفية اللعب</h2>
+  </header>
+  <div class="howto-body">
+    <h3>فكرة اللعبة</h3>
+    <p>ماتش أسئلة كورة بين ٢ لاعب، مكوّن من ٤ جولات متتالية. بعد كل ماتش بتتحدث نقاطك: فوز +٣، خسارة -٣، تعادل +١.</p>
+
+    <h3>الجولة ١ — معلومات لاعب</h3>
+    <p>بيظهرلك مركز اللاعب السري (مهاجم / وسط / مدافع / حارس مرمى). اللي يجيب اسمه صح ياخد ٥ أهداف. لو حد ضغط "لا أعرف" أو جاوب غلط، أو الاتنين معملوش حاجة خلال ٢٠ ثانية، بتتكشف جنسية اللاعب — الإجابة الصح هنا بـ ٣ أهداف. لو لسه محدش عرف، بيتكشف النادي — والإجابة الصح بـ ٢ هدف. أول واحد يعرف الاسم صح في أي مرحلة ياخد أهداف المرحلة دي وبعدين ننتقل للاعب سري تاني.</p>
+
+    <h3>الجولة ٢ — أسئلة عشوائية</h3>
+    <p>أسئلة كورة عامة (بطولات، دوريات، تاريخ). كل سؤال إجابته الصح بـ ٣ أهداف، ومؤقت ١٥ ثانية. لو الاتنين جاوبوا غلط أو "لا أعرف"، أو خلص الوقت، السؤال بيتغير من غير أهداف.</p>
+
+    <h3>الجولة ٣ — المزاد</h3>
+    <p>فئة زي "قول أكبر عدد لاعبين إسبان"، ومؤقت ٥٠ ثانية. كل لاعب يكتب أكبر عدد إجابات صحيحة يقدر عليه. اللي عنده إجابات صح أكتر (ومفيهوش أخطاء) ياخد ٣ أهداف. لو الاتنين عندهم أخطاء، اللي أخطاؤه أقل ياخد ٢ هدف بس.</p>
+
+    <h3>الجولة ٤ — تخمين اللاعب السري</h3>
+    <p>كل لاعب بياخد لاعب كورة حقيقي سري لازم يخمنه، وبيتبادلوا الأدوار في طرح أسئلة نعم/لا (سؤال واحد كل دور، مؤقت ١٥ ثانية للدور). أول لاعب يخمن اسم لاعبه السري صح ياخد ٥ أهداف.</p>
+
+    <h3>اللعب مع الذكاء الاصطناعي</h3>
+    <p>تقدر تلعب ماتش فوري ضد خصم ذكاء اصطناعي بنفس القواعد بالظبط، من غير ما تستنى حد.</p>
+  </div>
+</section>
+
+<section id="screen-friends" class="screen">
+  <header class="subbar">
+    <button class="back-btn" data-goto="screen-home">→</button>
+    <h2>الأصدقاء</h2>
+  </header>
+
+  <div class="add-friend-row">
+    <input type="text" id="friend-search-input" placeholder="ابحث باسم مستخدم صاحبك..."/>
+  </div>
+  <div id="friend-search-results" class="list-block"></div>
+
+  <div id="incoming-requests" class="list-block"></div>
+
+  <h3 class="list-title">قائمة أصدقائك</h3>
+  <div id="friends-list" class="list-block"></div>
+</section>
+
+<section id="screen-pick-opponent" class="screen">
+  <header class="subbar">
+    <button class="back-btn" data-goto="screen-home">→</button>
+    <h2>اختار خصمك</h2>
+  </header>
+  <div id="opponent-list" class="list-block"></div>
+</section>
+
+<section id="screen-waiting" class="screen">
+  <div class="waiting-box">
+    <div class="spinner"></div>
+    <p id="waiting-text">في انتظار رد الخصم...</p>
+    <button id="btn-cancel-wait" class="btn-ghost">إلغاء</button>
+  </div>
+</section>
+
+<section id="screen-game" class="screen">
+  <header class="game-topbar">
+    <div class="score-chip me">
+      <span id="game-my-name">أنا</span>
+      <span id="game-my-score" class="score-num">0</span>
+    </div>
+    <div class="round-indicator" id="round-indicator">جولة ١</div>
+    <div class="score-chip opp">
+      <span id="game-opp-score" class="score-num">0</span>
+      <span id="game-opp-name">الخصم</span>
+    </div>
+  </header>
+
+  <div class="timer-wrap">
+    <div class="timer-bar"><div id="timer-fill" class="timer-fill"></div></div>
+    <div id="timer-num" class="timer-num">--</div>
+  </div>
+
+  <div id="game-stage" class="game-stage"></div>
+</section>
+
+<section id="screen-result" class="screen">
+  <div class="result-box">
+    <div id="result-emoji" class="result-emoji">🏆</div>
+    <h2 id="result-title">نتيجة الماتش</h2>
+    <div class="final-score" id="result-score">٥ - ٣</div>
+    <div id="result-points" class="result-points"></div>
+    <button id="btn-back-home" class="btn-primary">رجوع للرئيسية</button>
+  </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+<script src="data.js" defer></script>
+<script src="app.js" defer></script>
+</body>
+</html>
