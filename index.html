@@ -191,9 +191,22 @@
   </div>
 </section>
 
+<div id="debug-error-box" style="display:none; position:fixed; top:0; left:0; right:0; z-index:99999; background:#c1462f; color:#fff; padding:14px; font-size:13px; font-family:monospace; max-height:50vh; overflow:auto; white-space:pre-wrap; direction:ltr; text-align:left;"></div>
+<script>
+  function showDebugError(msg) {
+    const box = document.getElementById("debug-error-box");
+    box.style.display = "block";
+    box.textContent += msg + "\n\n";
+  }
+  window.addEventListener("error", (e) => {
+    showDebugError("JS ERROR: " + e.message + "\nFile: " + e.filename + ":" + e.lineno);
+  });
+  window.addEventListener("unhandledrejection", (e) => {
+    showDebugError("PROMISE ERROR: " + (e.reason && e.reason.message ? e.reason.message : JSON.stringify(e.reason)));
+  });
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 <script src="data.js" defer></script>
 <script src="app.js" defer></script>
 </body>
 </html>
-
