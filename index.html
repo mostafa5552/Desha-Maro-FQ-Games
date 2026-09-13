@@ -79,10 +79,6 @@
   </div>
 
   <nav class="home-nav">
-    <button class="nav-card" data-goto="screen-friends">
-      <span class="nav-icon">👥</span>
-      <span>الأصدقاء</span>
-    </button>
     <button class="nav-card nav-card-main" id="btn-start-match">
       <span class="nav-icon">⚽</span>
       <span>ابدأ ماتش</span>
@@ -124,30 +120,13 @@
   </div>
 </section>
 
-<section id="screen-friends" class="screen">
-  <header class="subbar">
-    <button class="back-btn" data-goto="screen-home">→</button>
-    <h2>الأصدقاء</h2>
-  </header>
-
-  <div class="add-friend-row">
-    <input type="text" id="friend-search-input" placeholder="ابحث باسم مستخدم صاحبك..."/>
-  </div>
-  <div id="friend-search-results" class="list-block"></div>
-
-  <div id="incoming-requests" class="list-block"></div>
-
-  <h3 class="list-title">قائمة أصدقائك</h3>
-  <div id="friends-list" class="list-block"></div>
-</section>
-
 <section id="screen-pick-opponent" class="screen">
   <header class="subbar">
     <button class="back-btn" data-goto="screen-home">→</button>
-    <h2>اختار خصمك</h2>
+    <h2>ابدأ ماتش</h2>
   </header>
   <div class="add-friend-row">
-    <input type="text" id="opponent-search-input" placeholder="ابحث في قائمة أصدقائك..."/>
+    <input type="text" id="opponent-search-input" placeholder="ابحث باسم أي لاعب في اللعبة..."/>
   </div>
   <div id="opponent-list" class="list-block"></div>
 </section>
@@ -210,3 +189,4 @@
 <script src="app.js" defer></script>
 </body>
 </html>
+

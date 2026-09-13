@@ -14,7 +14,6 @@ let myInboxChannel = null;
 let currentMatch = null;
 let hostTimerHandle = null;
 let uiTickHandle = null;
-let friendsCache = [];
 
 const AI_ID = "ai-opponent";
 function isAiMatch(match) { return !!match && match.player2 === AI_ID; }
@@ -38,9 +37,7 @@ function oppKey(match) { return match.player1 === me.id ? "p2" : "p1"; }
 
 document.querySelectorAll("[data-goto]").forEach(el => {
   el.addEventListener("click", () => {
-    const target = el.dataset.goto;
-    showScreen(target);
-    if (target === "screen-friends") loadFriendsScreen();
+    showScreen(el.dataset.goto);
   });
 });
 
@@ -137,125 +134,6 @@ sb.auth.onAuthStateChange((event, session) => {
   if (session) afterLogin();
 })();
 
-let friendSearchTimer = null;
-document.getElementById("friend-search-input").addEventListener("input", (e) => {
-  const term = e.target.value.trim();
-  clearTimeout(friendSearchTimer);
-  const box = document.getElementById("friend-search-results");
-  if (!term) { box.innerHTML = ""; return; }
-  friendSearchTimer = setTimeout(() => runFriendSearch(term), 300);
-});
-
-async function runFriendSearch(term) {
-  const box = document.getElementById("friend-search-results");
-  const { data: results } = await sb
-    .from("profiles")
-    .select("id, username")
-    .ilike("username", `%${term}%`)
-    .neq("id", me.id)
-    .limit(8);
-
-  box.innerHTML = "";
-  if (!results || !results.length) {
-    box.innerHTML = `<div class="list-empty">مفيش نتائج</div>`;
-    return;
-  }
-  results.forEach(r => {
-    const row = document.createElement("div");
-    row.className = "row-card";
-    row.innerHTML = `<span class="name">${r.username}</span>
-      <button class="btn-small btn-primary" data-send-req="${r.id}">إرسال طلب</button>`;
-    box.appendChild(row);
-  });
-  box.querySelectorAll("[data-send-req]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const { error } = await sb.from("friend_requests").insert({ from_id: me.id, to_id: btn.dataset.sendReq });
-      if (error) return toast("الطلب موجود بالفعل أو حصل خطأ");
-      btn.disabled = true;
-      btn.textContent = "اتبعت";
-      toast("تم إرسال طلب الصداقة");
-    });
-  });
-}
-
-async function loadFriendsScreen() {
-  document.getElementById("friend-search-input").value = "";
-  document.getElementById("friend-search-results").innerHTML = "";
-  await loadIncomingRequests();
-  await loadFriendsList();
-}
-
-async function loadIncomingRequests() {
-  const box = document.getElementById("incoming-requests");
-  const { data: reqs } = await sb
-    .from("friend_requests")
-    .select("id, from_id, profiles!friend_requests_from_id_fkey(username)")
-    .eq("to_id", me.id)
-    .eq("status", "pending");
-
-  box.innerHTML = "";
-  if (!reqs || reqs.length === 0) return;
-
-  const title = document.createElement("h3");
-  title.className = "list-title";
-  title.textContent = "طلبات صداقة جديدة";
-  box.appendChild(title);
-
-  reqs.forEach(r => {
-    const row = document.createElement("div");
-    row.className = "row-card";
-    row.innerHTML = `
-      <span class="name">${r.profiles.username}</span>
-      <div class="row-actions">
-        <button class="btn-small btn-primary" data-accept="${r.id}" data-from="${r.from_id}">قبول</button>
-        <button class="btn-small btn-ghost" data-reject="${r.id}">رفض</button>
-      </div>`;
-    box.appendChild(row);
-  });
-
-  box.querySelectorAll("[data-accept]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const reqId = btn.dataset.accept;
-      const fromId = btn.dataset.from;
-      await sb.from("friend_requests").update({ status: "accepted" }).eq("id", reqId);
-      await sb.from("friends").insert([
-        { user_id: me.id, friend_id: fromId },
-        { user_id: fromId, friend_id: me.id },
-      ]);
-      toast("بقيتوا أصحاب!");
-      loadFriendsScreen();
-    });
-  });
-  box.querySelectorAll("[data-reject]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      await sb.from("friend_requests").update({ status: "rejected" }).eq("id", btn.dataset.reject);
-      loadFriendsScreen();
-    });
-  });
-}
-
-async function loadFriendsList() {
-  const box = document.getElementById("friends-list");
-  const { data: rows, error } = await sb
-    .from("friends")
-    .select("friend_id, profiles!friends_friend_id_fkey(username, points)")
-    .eq("user_id", me.id);
-
-  if (error) { toast("حصل خطأ في تحميل الأصدقاء: " + error.message); }
-  friendsCache = rows || [];
-  box.innerHTML = "";
-  if (!friendsCache.length) {
-    box.innerHTML = `<div class="list-empty">لسه معندكش أصحاب — دور بالبحث فوق</div>`;
-    return;
-  }
-  friendsCache.forEach(f => {
-    const row = document.createElement("div");
-    row.className = "row-card";
-    row.innerHTML = `<span class="name">${f.profiles.username}</span><span class="sub">${f.profiles.points} نقطة</span>`;
-    box.appendChild(row);
-  });
-}
-
 document.getElementById("btn-play-ai").addEventListener("click", startAiMatch);
 
 async function startAiMatch() {
@@ -269,55 +147,56 @@ async function startAiMatch() {
   enterGame(currentMatch);
 }
 
-document.getElementById("btn-start-match").addEventListener("click", async () => {
-  const { data, error } = await sb
-    .from("friends")
-    .select("friend_id, profiles!friends_friend_id_fkey(username)")
-    .eq("user_id", me.id);
-
-  if (error) {
-    toast("حصل خطأ في جلب الأصدقاء: " + error.message);
-    friendsCache = [];
-  } else {
-    friendsCache = data || [];
-  }
-
+document.getElementById("btn-start-match").addEventListener("click", () => {
   document.getElementById("opponent-search-input").value = "";
-  renderOpponentList(friendsCache);
+  document.getElementById("opponent-list").innerHTML = "";
   showScreen("screen-pick-opponent");
 });
 
-function renderOpponentList(list) {
+let opponentSearchTimer = null;
+document.getElementById("opponent-search-input").addEventListener("input", (e) => {
+  const term = e.target.value.trim();
+  clearTimeout(opponentSearchTimer);
   const box = document.getElementById("opponent-list");
+  if (!term) { box.innerHTML = ""; return; }
+  opponentSearchTimer = setTimeout(() => runOpponentSearch(term), 300);
+});
+
+async function runOpponentSearch(term) {
+  const box = document.getElementById("opponent-list");
+  const { data: results, error } = await sb
+    .from("profiles")
+    .select("id, username")
+    .ilike("username", `%${term}%`)
+    .neq("id", me.id)
+    .limit(10);
+
   box.innerHTML = "";
-  if (!list.length) {
-    box.innerHTML = friendsCache.length
-      ? `<div class="list-empty">مفيش نتائج مطابقة</div>`
-      : `<div class="list-empty">ضيف أصدقاء الأول من صفحة الأصدقاء</div>`;
+  if (error) { box.innerHTML = `<div class="list-empty">حصل خطأ: ${error.message}</div>`; return; }
+  if (!results || !results.length) {
+    box.innerHTML = `<div class="list-empty">مفيش نتائج</div>`;
     return;
   }
-  list.forEach(f => {
+  results.forEach(r => {
     const row = document.createElement("div");
     row.className = "row-card";
-    row.innerHTML = `<span class="name">${f.profiles.username}</span>
-      <button class="btn-small btn-primary" data-play="${f.friend_id}">ماتش</button>`;
+    row.innerHTML = `<span class="name">${r.username}</span>
+      <button class="btn-small btn-primary" data-play="${r.id}">طلب مباراة</button>`;
     box.appendChild(row);
   });
   box.querySelectorAll("[data-play]").forEach(btn => {
-    btn.addEventListener("click", () => sendMatchRequest(btn.dataset.play));
+    btn.addEventListener("click", () => {
+      btn.disabled = true;
+      btn.textContent = "اتبعت";
+      sendMatchRequest(btn.dataset.play);
+    });
   });
 }
-
-document.getElementById("opponent-search-input").addEventListener("input", (e) => {
-  const term = e.target.value.trim().toLowerCase();
-  if (!term) { renderOpponentList(friendsCache); return; }
-  const filtered = friendsCache.filter(f => f.profiles.username.toLowerCase().includes(term));
-  renderOpponentList(filtered);
-});
 
 async function sendMatchRequest(opponentId) {
   const { data, error } = await sb.from("matches").insert({
     player1: me.id, player2: opponentId, status: "pending", state: {},
+
   }).select().single();
   if (error) return toast("حصل خطأ وأنت بتبعت طلب الماتش");
   currentMatch = data;
