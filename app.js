@@ -1,4 +1,4 @@
-const SUPABASE_URL = "https://qiyothuyrbudbyxownpk.supabase.co";
+const SUPABASE_URL = "";
 const SUPABASE_ANON_KEY = "sb_publishable_AwhUDlto_zbxXOYLy-DDsA_22L1D15l";
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -236,11 +236,12 @@ async function loadIncomingRequests() {
 
 async function loadFriendsList() {
   const box = document.getElementById("friends-list");
-  const { data: rows } = await sb
+  const { data: rows, error } = await sb
     .from("friends")
     .select("friend_id, profiles!friends_friend_id_fkey(username, points)")
     .eq("user_id", me.id);
 
+  if (error) { toast("حصل خطأ في تحميل الأصدقاء: " + error.message); }
   friendsCache = rows || [];
   box.innerHTML = "";
   if (!friendsCache.length) {
@@ -269,27 +270,49 @@ async function startAiMatch() {
 }
 
 document.getElementById("btn-start-match").addEventListener("click", async () => {
-  await sb.from("friends").select("friend_id, profiles!friends_friend_id_fkey(username)").eq("user_id", me.id)
-    .then(({ data }) => {
-      friendsCache = data || [];
-      const box = document.getElementById("opponent-list");
-      box.innerHTML = "";
-      if (!friendsCache.length) {
-        box.innerHTML = `<div class="list-empty">ضيف أصحاب الأول من صفحة الأصدقاء</div>`;
-      } else {
-        friendsCache.forEach(f => {
-          const row = document.createElement("div");
-          row.className = "row-card";
-          row.innerHTML = `<span class="name">${f.profiles.username}</span>
-            <button class="btn-small btn-primary" data-play="${f.friend_id}">ماتش</button>`;
-          box.appendChild(row);
-        });
-        box.querySelectorAll("[data-play]").forEach(btn => {
-          btn.addEventListener("click", () => sendMatchRequest(btn.dataset.play));
-        });
-      }
-      showScreen("screen-pick-opponent");
-    });
+  const { data, error } = await sb
+    .from("friends")
+    .select("friend_id, profiles!friends_friend_id_fkey(username)")
+    .eq("user_id", me.id);
+
+  if (error) {
+    toast("حصل خطأ في جلب الأصدقاء: " + error.message);
+    friendsCache = [];
+  } else {
+    friendsCache = data || [];
+  }
+
+  document.getElementById("opponent-search-input").value = "";
+  renderOpponentList(friendsCache);
+  showScreen("screen-pick-opponent");
+});
+
+function renderOpponentList(list) {
+  const box = document.getElementById("opponent-list");
+  box.innerHTML = "";
+  if (!list.length) {
+    box.innerHTML = friendsCache.length
+      ? `<div class="list-empty">مفيش نتائج مطابقة</div>`
+      : `<div class="list-empty">ضيف أصدقاء الأول من صفحة الأصدقاء</div>`;
+    return;
+  }
+  list.forEach(f => {
+    const row = document.createElement("div");
+    row.className = "row-card";
+    row.innerHTML = `<span class="name">${f.profiles.username}</span>
+      <button class="btn-small btn-primary" data-play="${f.friend_id}">ماتش</button>`;
+    box.appendChild(row);
+  });
+  box.querySelectorAll("[data-play]").forEach(btn => {
+    btn.addEventListener("click", () => sendMatchRequest(btn.dataset.play));
+  });
+}
+
+document.getElementById("opponent-search-input").addEventListener("input", (e) => {
+  const term = e.target.value.trim().toLowerCase();
+  if (!term) { renderOpponentList(friendsCache); return; }
+  const filtered = friendsCache.filter(f => f.profiles.username.toLowerCase().includes(term));
+  renderOpponentList(filtered);
 });
 
 async function sendMatchRequest(opponentId) {
