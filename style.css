@@ -191,7 +191,7 @@ h1,h2,h3, .score-num, .stat-value, .final-score, .round-indicator{
   border-radius: var(--radius); padding:22px; text-align:center;
 }
 .player-card-box .clue-label{ font-size:12px; color:var(--grey); margin-bottom:8px; }
-.player-card-box .clue-value{ font-size:26px; font-weight:700; color:var(--gold-bright); }
+.player-card-box .clue-value{ font-size:22px; font-weight:700; color:var(--gold-bright); line-height:1.5; }
 
 .q-box{
   background: rgba(244,247,242,0.05); border:1px solid rgba(244,247,242,0.12);

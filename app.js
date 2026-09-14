@@ -272,7 +272,7 @@ function buildInitialState() {
     round: 1,
     scoreP1: 0, scoreP2: 0,
     stepKey: "start",
-    r1: { players, idx: 0, phase: "position" },
+    r1: { players, idx: 0, lastResult: null },
     r2: { questions, idx: 0 },
     r3: { category, submittedP1: false, submittedP2: false, listP1: [], listP2: [] },
     r4: {
@@ -370,19 +370,33 @@ async function sendMyInput(payload) {
 function renderRound1(match, stage) {
   const s = match.state, r1 = s.r1;
   const player = r1.players[r1.idx];
-  const phaseLabel = { position: "المركز", nationality: "الجنسية", club: "النادي" }[r1.phase];
-  const clueValue = player[{ position: "position", nationality: "nation", club: "club" }[r1.phase]];
+  const clue = `${player.position} - ${player.nation} - ${player.club}`;
+
+  if (r1.lastResult) {
+    const last = document.createElement("div");
+    last.className = "status-line";
+    const who = r1.lastResult.winner === null ? "محدش عرفها"
+      : r1.lastResult.winner === myKey(match) ? "أنا كسبتها"
+      : "الخصم كسبها";
+    last.textContent = `آخر لاعب كان "${r1.lastResult.playerName}" — ${who}`;
+    stage.appendChild(last);
+  }
+
+  const counter = document.createElement("div");
+  counter.className = "status-line";
+  counter.textContent = `لاعب ${r1.idx + 1} من ${r1.players.length}`;
+  stage.appendChild(counter);
 
   const box = document.createElement("div");
   box.className = "player-card-box";
-  box.innerHTML = `<div class="clue-label">${phaseLabel}</div><div class="clue-value">${clueValue}</div>`;
+  box.innerHTML = `<div class="clue-label">مين اللاعب؟</div><div class="clue-value">${clue}</div>`;
   stage.appendChild(box);
 
   stage.appendChild(makeGuessForm("اكتب اسم اللاعب", async (val) => {
-    sendMyInput({ type: "guess", value: val, ts: Date.now(), step: r1.idx + "-" + r1.phase });
-  }, () => sendMyInput({ type: "dontknow", ts: Date.now(), step: r1.idx + "-" + r1.phase })));
+    sendMyInput({ type: "guess", value: val, ts: Date.now(), step: String(r1.idx) });
+  }, () => sendMyInput({ type: "dontknow", ts: Date.now(), step: String(r1.idx) })));
 
-  stage.appendChild(opponentStatusLine(match, r1.idx + "-" + r1.phase));
+  stage.appendChild(opponentStatusLine(match, String(r1.idx)));
 }
 
 function renderRound2(match, stage) {
@@ -598,8 +612,9 @@ async function aiJudgeBatch(context, correctAnswer, submissions) {
     return fallback;
   }
 }
-async function aiRound1Guess(phase, clueValue) {
+async function aiRound1Guess(clue) {
   try {
+    const { data, error } = await sb.functions.invoke("hyper-worker", { body: { mode: "ai_round1_guess", clue } });
     if (error) throw error;
     return data.guess || null;
   } catch (e) { return null; }
@@ -666,7 +681,7 @@ async function bumpProfile(userId, pointsDelta, kind) {
 
 async function hostResolveRound1(s, ip1, ip2) {
   const r1 = s.r1;
-  const stepId = r1.idx + "-" + r1.phase;
+  const stepId = String(r1.idx);
   const a1 = ip1.step === stepId ? ip1 : null;
   const a2 = ip2.step === stepId ? ip2 : null;
   const bothActed = a1 && a2;
@@ -674,8 +689,6 @@ async function hostResolveRound1(s, ip1, ip2) {
   if (!bothActed && !timedOut) return;
 
   const player = r1.players[r1.idx];
-  const points = { position: 5, nationality: 3, club: 2 }[r1.phase];
-
   const submissions = [];
   if (a1 && a1.type === "guess") submissions.push({ id: "p1", text: a1.value });
   if (a2 && a2.type === "guess") submissions.push({ id: "p2", text: a2.value });
@@ -687,29 +700,18 @@ async function hostResolveRound1(s, ip1, ip2) {
     correct2 = !!results["p2"];
   }
 
-  if (correct1 && !correct2) { s.scoreP1 += points; advanceRound1Player(s); }
-  else if (correct2 && !correct1) { s.scoreP2 += points; advanceRound1Player(s); }
+  let winner = null;
+  if (correct1 && !correct2) { s.scoreP1 += 3; winner = "p1"; }
+  else if (correct2 && !correct1) { s.scoreP2 += 3; winner = "p2"; }
   else if (correct1 && correct2) {
-    if (a1.ts <= a2.ts) s.scoreP1 += points; else s.scoreP2 += points;
-    advanceRound1Player(s);
-  } else {
-    advanceRound1Phase(s);
+    if (a1.ts <= a2.ts) { s.scoreP1 += 3; winner = "p1"; } else { s.scoreP2 += 3; winner = "p2"; }
   }
-  if (s._advance) return;
-  s.deadlineTs = Date.now() + roundTimeFor(1) * 1000;
-  await commitState(s);
-}
-function advanceRound1Phase(s) {
-  const r1 = s.r1;
-  if (r1.phase === "position") r1.phase = "nationality";
-  else if (r1.phase === "nationality") r1.phase = "club";
-  else advanceRound1Player(s);
-}
-function advanceRound1Player(s) {
-  const r1 = s.r1;
+
+  r1.lastResult = { playerName: player.name, winner };
   r1.idx += 1;
-  r1.phase = "position";
-  if (r1.idx >= r1.players.length) s._advance = true;
+  s.deadlineTs = Date.now() + roundTimeFor(1) * 1000;
+  if (r1.idx >= r1.players.length) { await goToNextRound(s); return; }
+  await commitState(s);
 }
 
 async function hostResolveRound2(s, ip1, ip2) {
@@ -829,7 +831,7 @@ async function hostMaybeResolveSafe(row) {
   try {
     const s = JSON.parse(JSON.stringify(row.state));
     const ip1 = row.input_p1 || {}, ip2 = row.input_p2 || {};
-    if (s.round === 1) { await hostResolveRound1(s, ip1, ip2); if (s._advance) { delete s._advance; await goToNextRound(s); } }
+    if (s.round === 1) await hostResolveRound1(s, ip1, ip2);
     else if (s.round === 2) await hostResolveRound2(s, ip1, ip2);
     else if (s.round === 3) await hostResolveRound3(s, ip1, ip2);
     else if (s.round === 4) await hostResolveRound4(s, ip1, ip2);
@@ -845,7 +847,7 @@ async function hostAdvanceOnTimeout() {
 }
 
 function aiStepSignature(s) {
-  if (s.round === 1) return `1-${s.r1.idx}-${s.r1.phase}`;
+  if (s.round === 1) return `1-${s.r1.idx}`;
   if (s.round === 2) return `2-${s.r2.idx}`;
   if (s.round === 3) return `3`;
   if (s.round === 4) return `4-${s.r4.turn}-${s.r4.history.length}`;
@@ -877,11 +879,11 @@ async function performAiMove(expectedSig) {
 
   if (s.round === 1) {
     const r1 = s.r1, player = r1.players[r1.idx];
-    const field = { position: "position", nationality: "nation", club: "club" }[r1.phase];
-    const guess = await aiRound1Guess(r1.phase, player[field]);
+    const clue = `${player.position} - ${player.nation} - ${player.club}`;
+    const guess = await aiRound1Guess(clue);
     await sendAiInput(guess
-      ? { type: "guess", value: guess, ts: Date.now(), step: r1.idx + "-" + r1.phase }
-      : { type: "dontknow", ts: Date.now(), step: r1.idx + "-" + r1.phase });
+      ? { type: "guess", value: guess, ts: Date.now(), step: String(r1.idx) }
+      : { type: "dontknow", ts: Date.now(), step: String(r1.idx) });
 
   } else if (s.round === 2) {
     const q = s.r2.questions[s.r2.idx];
